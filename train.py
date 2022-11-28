@@ -107,11 +107,11 @@ for epoch in tqdm(range(hp.num_epochs)):
                 "Training Weighted F1":training_weighted_f1_metric.result(), "Validation Weighted F1":validation_weighted_f1_metric.result(), "Test Weighted F1":test_weighted_f1_metric.result()})
 
     # Save model if best dev weighted F1
-    if validation_weighted_f1_metric.result().numpy() > best_dev_weighted_f1:
-        if os.path.exists('./saved_model'):
-            shutil.rmtree('./saved_model')
-        hgnn.save('saved_model/epoch_'+str(epoch))
-        best_dev_weighted_f1=validation_weighted_f1_metric.result().numpy()
+    # if validation_weighted_f1_metric.result().numpy() > best_dev_weighted_f1:
+    #     if os.path.exists('./saved_model'):
+    #         shutil.rmtree('./saved_model')
+    #     hgnn.save('saved_model/epoch_'+str(epoch))
+    #     best_dev_weighted_f1=validation_weighted_f1_metric.result().numpy()
     
     # Reset metrics
     training_accuracy_metric.reset_states()

@@ -23,6 +23,7 @@ class HGNN(tf.keras.Model):
     self.multi_head_attention2 = tf.keras.layers.MultiHeadAttention(4, 512)
 
     self.H1 = HGraph(512)
+    self.H2 = HGraph(512)
     self.h_dense = tf.keras.layers.Dense(512, activation=tf.keras.activations.sigmoid)
 
     self.emotion_categories = tf.keras.layers.Dense(7, activation=tf.keras.activations.softmax)
@@ -60,6 +61,7 @@ class HGNN(tf.keras.Model):
     
     
     result = self.H1(([enc, A]))  # shape = (32, 90, 512)
+    result = self.H2(([result, A]))  # shape = (32, 90, 512)
     result = self.h_dense(result)
     result = tf.reduce_max(input_tensor=result, axis = 1)
 
