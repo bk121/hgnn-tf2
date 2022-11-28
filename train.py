@@ -23,7 +23,6 @@ parser.add_argument('--target_test', type=str, default=base_dir + 'corpora/test_
 parser.add_argument('--source_dev', type=str, default=base_dir + 'corpora/dev_query.txt', help='src dev file')
 parser.add_argument('--target_dev', type=str, default=base_dir + 'corpora/dev_answer.txt', help='tgt dev file')
 parser.add_argument('--corpora_path', type=str, default=base_dir + 'corpora/', help='image file')
-parser.add_argument('--logdir', type=str, default='logdir2020_test', help='logdir')
 parser.add_argument('--batch_size', type=int, default=32, help='batch size')
 parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
 parser.add_argument('--dropout_rate', type=float, default=0.1, help='dropout ratio')
@@ -70,7 +69,6 @@ optimizer = tf.keras.optimizers.Adam(learning_rate = hp.lr)
 
 
 
-print()
 
 best_dev_weighted_f1 = 0
 
@@ -84,7 +82,7 @@ for epoch in tqdm(range(hp.num_epochs)):
         optimizer.apply_gradients(zip(grads, hgnn.trainable_weights))
         training_accuracy_metric.update_state(TGT_emotion, emotion_probs)  
         training_weighted_f1_metric.update_state(tf.one_hot(TGT_emotion, 7), emotion_probs)  
-    
+
     # Validation
     for (X, X_image, Y_image, X_length, Y, X_turn_number, SRC_emotion, TGT_emotion, Speakers, A) in validation_dataset:
         emotion_probs = hgnn(X, X_image, SRC_emotion, Speakers, A, training=False)

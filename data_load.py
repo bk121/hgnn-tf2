@@ -189,10 +189,6 @@ def get_dataset(hp, dataset):
     elif dataset=='test':
         X, X_image, Y_image, X_length, Y, sources,targets, X_turn_number, SRC_emotion, TGT_emotion, Speakers, A = load_test_data(hp)
 
-    # calc total batch count
-    num_batch = len(X) // hp.batch_size
-    
-
     # print('X', X.shape)
     # print('X_image', X_image.shape)
     # print('Y_image', Y_image.shape)
@@ -205,10 +201,9 @@ def get_dataset(hp, dataset):
     # print('A', A.shape)
 
     dataset = tf.data.Dataset.from_tensor_slices((X,X_image,Y_image,X_length,Y,X_turn_number,SRC_emotion,TGT_emotion,Speakers,A))
-    it = dataset.as_numpy_iterator()
-    print(dataset.element_spec)
-    print('Shuffling...')
-    # dataset = dataset.shuffle(10,000, reshuffle_each_iteration=False)
+    # print('Shuffling...')
+    dataset = dataset.shuffle(10,000, reshuffle_each_iteration=False)
     dataset = dataset.batch(hp.batch_size)
-    print(dataset.element_spec)    
+
+    # print(dataset.element_spec)
     return dataset
