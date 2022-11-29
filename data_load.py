@@ -1,14 +1,9 @@
 # -*- coding: utf-8 -*-
 #/usr/bin/python2
-# from __future__ import print_function
-#from hyperparams import Hyperparams as hp
-# import os
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import pickle as pkl
 import numpy as np
 import codecs, code, os
-#import regex
 emotion2idx = {'neutral': 0, 'surprise': 1, 'fear': 2, 'sadness': 3, 'joy': 4, 'disgust': 5, 'anger': 6}
 idx2emotion = {0: 'neutral', 1: 'surprise', 2: 'fear', 3: 'sadness', 4: 'joy', 5: 'disgust', 6: 'anger'}
 
@@ -189,19 +184,8 @@ def get_dataset(hp, dataset):
     elif dataset=='test':
         X, X_image, Y_image, X_length, Y, sources,targets, X_turn_number, SRC_emotion, TGT_emotion, Speakers, A = load_test_data(hp)
 
-    # print('X', X.shape)
-    # print('X_image', X_image.shape)
-    # print('Y_image', Y_image.shape)
-    # print('X_length', X_length.shape)
-    # print('Y', Y.shape)
-    # print('X_turn_number', X_turn_number.shape)
-    # print('SRC_emotion', SRC_emotion.shape)
-    # print('TGT_emotion', TGT_emotion.shape)
-    # print('Speakers', Speakers.shape)
-    # print('A', A.shape)
 
     dataset = tf.data.Dataset.from_tensor_slices((X,X_image,Y_image,X_length,Y,X_turn_number,SRC_emotion,TGT_emotion,Speakers,A))
-    # print('Shuffling...')
     dataset = dataset.shuffle(10,000, reshuffle_each_iteration=False)
     dataset = dataset.batch(hp.batch_size)
 
