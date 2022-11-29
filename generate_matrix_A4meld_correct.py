@@ -46,7 +46,6 @@ def readFileRows(filepath):
         count = 0
         adj_matrix = []
         print('complete dialogue number, utterance number',len(set(Dialogue_ID)), len(Dialogue_ID))
-        counts={}
         Dialogue_ID_copy=Dialogue_ID[:]
         Dialogue_ID_copy.append(str(int(Dialogue_ID[-1])+1)) # capture last dialogue
         for idx in range(int(Dialogue_ID[-1])+1):
@@ -65,13 +64,14 @@ def readFileRows(filepath):
                         continue;
                     for k in range(len(dialogue)-1):
                         adj_matrices = []
-                        adj_matrix_speaker_text = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_speaker_ima = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_text_ima = sp.lil_matrix((90, 90), dtype='int8')
                         adj_matrix_utt_utt = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_speaker_speaker = sp.lil_matrix((90, 90), dtype='int8')
+                        adj_matrix_text_ima = sp.lil_matrix((90, 90), dtype='int8')
                         adj_matrix_emotion_text = sp.lil_matrix((90, 90), dtype='int8')
+                        adj_matrix_speaker_text = sp.lil_matrix((90, 90), dtype='int8')
+                        adj_matrix_ima_ima = sp.lil_matrix((90, 90), dtype='int8')
+                        adj_matrix_speaker_ima = sp.lil_matrix((90, 90), dtype='int8')
                         adj_matrix_emotion_ima = sp.lil_matrix((90, 90), dtype='int8')
+                        adj_matrix_speaker_speaker = sp.lil_matrix((90, 90), dtype='int8')
                         for j in range(k+1):
                             adj_matrix_speaker_text[j, 70+word2embed[speaker[j]]] = 1
                             adj_matrix_speaker_text[70+word2embed[speaker[j]], j] = 1
@@ -81,42 +81,39 @@ def readFileRows(filepath):
                             adj_matrix_text_ima[j+35, j] = 1
                             adj_matrix_emotion_text[j, 83+emotion2idx[emotion[j]]] = 1
                             adj_matrix_emotion_text[83+emotion2idx[emotion[j]], j] = 1
-                            adj_matrix_emotion_ima[j, 83+emotion2idx[emotion[j]]] = 1
-                            adj_matrix_emotion_ima[83+emotion2idx[emotion[j]], j] = 1
-                            for i in range(j, k+1):
+                            adj_matrix_emotion_ima[j+35, 83+emotion2idx[emotion[j]]] = 1
+                            adj_matrix_emotion_ima[83+emotion2idx[emotion[j]], j+35] = 1
+                            for i in range(k+1):
                                 adj_matrix_speaker_speaker[70+word2embed[speaker[j]], 70+word2embed[speaker[i]]] = 1
                                 adj_matrix_speaker_speaker[70+word2embed[speaker[i]], 70+word2embed[speaker[j]]] = 1
-                                if speaker[i] == speaker[j]:
+                                if speaker[i] == speaker[j] and i != j:
                                     adj_matrix_utt_utt[j, i] = 1
-                                    adj_matrix_utt_utt[j, i+35] = 1
-                                    adj_matrix_utt_utt[j+35, i] = 1
-                                    adj_matrix_utt_utt[j+35, i+35] = 1
+                                    adj_matrix_ima_ima[j+35, i+35] = 1
                                 elif i - j == 1:
                                     adj_matrix_utt_utt[j, i] = 1
-                                    adj_matrix_utt_utt[j, i+35] = 1
-                                    adj_matrix_utt_utt[j+35, i] =1
-                                    adj_matrix_utt_utt[j+35, i+35] = 1
-                                elif emotion[i] == emotion[j]:
+                                    adj_matrix_ima_ima[j+35, i+35] = 1
+                                elif j - i == 1:
                                     adj_matrix_utt_utt[j, i] = 1
-                                    adj_matrix_utt_utt[j, i+35] = 1
-                                    adj_matrix_utt_utt[j+35, i] =1
-                                    adj_matrix_utt_utt[j+35, i+35] = 1
+                                    adj_matrix_ima_ima[j+35, i+35] = 1
                                 
-                            adj_matrix_speaker_text = adj_matrix_speaker_text.tocsr()
-                            adj_matrix_speaker_ima = adj_matrix_speaker_ima.tocsr()
-                            adj_matrix_text_ima = adj_matrix_text_ima.tocsr()
                             adj_matrix_utt_utt = adj_matrix_utt_utt.tocsr()
-                            adj_matrix_speaker_speaker = adj_matrix_speaker_speaker.tocsr()
-                            adj_matrix_emotion_ima = adj_matrix_emotion_ima.tocsr()
+                            adj_matrix_text_ima = adj_matrix_text_ima.tocsr()
                             adj_matrix_emotion_text = adj_matrix_emotion_text.tocsr()
+                            adj_matrix_speaker_text = adj_matrix_speaker_text.tocsr()
+                            adj_matrix_ima_ima = adj_matrix_ima_ima.tocsr()
+                            adj_matrix_speaker_ima = adj_matrix_speaker_ima.tocsr()
+                            adj_matrix_emotion_ima = adj_matrix_emotion_ima.tocsr()
+                            adj_matrix_speaker_speaker = adj_matrix_speaker_speaker.tocsr()
 
-                        adj_matrices.append(adj_matrix_speaker_text)
-                        adj_matrices.append(adj_matrix_speaker_ima)
-                        adj_matrices.append(adj_matrix_text_ima)
                         adj_matrices.append(adj_matrix_utt_utt)
-                        adj_matrices.append(adj_matrix_speaker_speaker)
+                        adj_matrices.append(adj_matrix_text_ima)
                         adj_matrices.append(adj_matrix_emotion_text)
+                        adj_matrices.append(adj_matrix_speaker_text)
+                        adj_matrices.append(adj_matrix_ima_ima)
+                        adj_matrices.append(adj_matrix_speaker_ima)
                         adj_matrices.append(adj_matrix_emotion_ima)
+                        # adj_matrices.append(adj_matrix_speaker_speaker) # not in paper
+                        
                         adj_matrix.append(adj_matrices)
 
                     dialogue = []
@@ -124,7 +121,7 @@ def readFileRows(filepath):
                     emotion = []
         print('count=',count)           
         print('index=',index)
-        pkl.dump(adj_matrix, open(data_type+'.pkl', 'wb'), protocol=-1)
+        pkl.dump(adj_matrix, open('corpora/'+data_type+'.pkl', 'wb'), protocol=-1)
         print(len(adj_matrix))
         # for i,adj in enumerate(adj_matrix[3]):
         #     print(adj)
