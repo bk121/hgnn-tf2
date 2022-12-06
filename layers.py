@@ -1,4 +1,22 @@
 import tensorflow as tf
+import numpy as np
+
+
+def positional_encoding(length, depth):
+  depth = depth/2
+
+  positions = np.arange(length)[:, np.newaxis]     # (seq, 1)
+  depths = np.arange(depth)[np.newaxis, :]/depth   # (1, depth)
+
+  angle_rates = 1 / (10000**depths)         # (1, depth)
+  angle_rads = positions * angle_rates      # (pos, depth)
+
+  pos_encoding = np.concatenate(
+      [np.sin(angle_rads), np.cos(angle_rads)],
+      axis=-1) 
+
+  return tf.cast(pos_encoding, dtype=tf.float32)
+
 
 
 class HGraph(tf.keras.layers.Layer):
@@ -26,7 +44,7 @@ class HGraph(tf.keras.layers.Layer):
         self.num_nodes = features_shape[1]
         self.num_features = features_shape[2]
         self.num_relations = input_shapes[1][1]
-        self.node_types = 4
+        self.node_types = 5
         self.W = []
         self.B = []
         for i in range(self.node_types):
@@ -59,21 +77,31 @@ class HGraph(tf.keras.layers.Layer):
         Mask = []
         # construct utterance mask
         mask_u = tf.concat((tmp_u1, tmp_u0), -2)
+        mask_u = tf.concat((mask_u, tmp_u0), -2)
         mask_u = tf.concat((mask_u, tmp_e0), -2)
         mask_u = tf.concat((mask_u, tmp_s0), -2)
         Mask.append(tf.tile(tf.expand_dims(mask_u, 0),[batch_size, 1, 1]))
         # construct facial features mask
         mask_f = tf.concat((tmp_u0, tmp_u1), -2)
+        mask_f = tf.concat((mask_f, tmp_u0), -2)
         mask_f = tf.concat((mask_f, tmp_e0), -2)
         mask_f = tf.concat((mask_f, tmp_s0), -2)
         Mask.append(tf.tile(tf.expand_dims(mask_f, 0),[batch_size, 1, 1]))
+        # construct audio features mask
+        mask_a = tf.concat((tmp_u0, tmp_u0), -2)
+        mask_a = tf.concat((mask_a, tmp_u1), -2)
+        mask_a = tf.concat((mask_a, tmp_e0), -2)
+        mask_a = tf.concat((mask_a, tmp_s0), -2)
+        Mask.append(tf.tile(tf.expand_dims(mask_a, 0),[batch_size, 1, 1]))
         # construct speaker mask
         mask_s = tf.concat((tmp_u0, tmp_u0), -2)
+        mask_s = tf.concat((mask_s, tmp_u0), -2)
         mask_s = tf.concat((mask_s, tmp_e0), -2)
         mask_s = tf.concat((mask_s, tmp_s1), -2)
         Mask.append(tf.tile(tf.expand_dims(mask_s, 0),[batch_size, 1, 1]))
         # construct emotion mask
         mask_e = tf.concat((tmp_u0, tmp_u0), -2)
+        mask_e = tf.concat((mask_e, tmp_u0), -2)
         mask_e = tf.concat((mask_e, tmp_e1), -2)
         mask_e = tf.concat((mask_e, tmp_s0), -2)
         Mask.append(tf.tile(tf.expand_dims(mask_e, 0),[batch_size, 1, 1]))
@@ -84,7 +112,6 @@ class HGraph(tf.keras.layers.Layer):
             A_.append(eye)
         A_sum = tf.stack(A_, axis=1)
         A_sum = tf.math.reduce_sum(A_sum, axis=1)
-
         AHWs = []
         for i in range(self.node_types):
             type_A = Mask[i] * A_sum 

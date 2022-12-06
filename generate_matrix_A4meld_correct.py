@@ -64,56 +64,65 @@ def readFileRows(filepath):
                         continue;
                     for k in range(len(dialogue)-1):
                         adj_matrices = []
-                        adj_matrix_utt_utt = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_text_ima = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_emotion_text = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_speaker_text = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_ima_ima = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_speaker_ima = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_emotion_ima = sp.lil_matrix((90, 90), dtype='int8')
-                        adj_matrix_speaker_speaker = sp.lil_matrix((90, 90), dtype='int8')
+                        adj_matrix_text_text = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_text_ima = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_emotion_text = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_speaker_text = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_ima_ima = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_speaker_ima = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_emotion_ima = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_text_audio = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_audio_audio = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_audio_speaker = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_audio_emotion = sp.lil_matrix((125, 125), dtype='int8')
+                        
                         for j in range(k+1):
-                            adj_matrix_speaker_text[j, 70+word2embed[speaker[j]]] = 1
-                            adj_matrix_speaker_text[70+word2embed[speaker[j]], j] = 1
-                            adj_matrix_speaker_ima[j+35, 70+word2embed[speaker[j]]] = 1
-                            adj_matrix_speaker_ima[70+word2embed[speaker[j]], j+35] = 1
+                            adj_matrix_speaker_text[j, 105+word2embed[speaker[j]]] = 1
+                            adj_matrix_speaker_text[105+word2embed[speaker[j]], j] = 1
+                            adj_matrix_speaker_ima[j+35, 105+word2embed[speaker[j]]] = 1
+                            adj_matrix_speaker_ima[105+word2embed[speaker[j]], j+35] = 1
                             adj_matrix_text_ima[j, j+35] = 1
                             adj_matrix_text_ima[j+35, j] = 1
-                            adj_matrix_emotion_text[j, 83+emotion2idx[emotion[j]]] = 1
-                            adj_matrix_emotion_text[83+emotion2idx[emotion[j]], j] = 1
-                            adj_matrix_emotion_ima[j+35, 83+emotion2idx[emotion[j]]] = 1
-                            adj_matrix_emotion_ima[83+emotion2idx[emotion[j]], j+35] = 1
+                            adj_matrix_text_audio[j+70, j] = 1
+                            adj_matrix_text_audio[j, j+70] = 1
+                            adj_matrix_audio_speaker[105+word2embed[speaker[j]], j+70] = 1
+                            adj_matrix_audio_speaker[j+70, 105+word2embed[speaker[j]]] = 1
+                            adj_matrix_audio_emotion[118+emotion2idx[emotion[j]], j+70] = 1
+                            adj_matrix_audio_emotion[j+70, 118+emotion2idx[emotion[j]]] = 1
+                            adj_matrix_emotion_text[j, 118+emotion2idx[emotion[j]]] = 1
+                            adj_matrix_emotion_text[118+emotion2idx[emotion[j]], j] = 1
+                            adj_matrix_emotion_ima[j+35, 118+emotion2idx[emotion[j]]] = 1
+                            adj_matrix_emotion_ima[118+emotion2idx[emotion[j]], j+35] = 1
                             for i in range(k+1):
-                                adj_matrix_speaker_speaker[70+word2embed[speaker[j]], 70+word2embed[speaker[i]]] = 1
-                                adj_matrix_speaker_speaker[70+word2embed[speaker[i]], 70+word2embed[speaker[j]]] = 1
-                                if speaker[i] == speaker[j] and i != j:
-                                    adj_matrix_utt_utt[j, i] = 1
+                                if (speaker[i] == speaker[j] and i != j) or i - j == 1 or j - i == 1:
+                                    adj_matrix_text_text[j, i] = 1
                                     adj_matrix_ima_ima[j+35, i+35] = 1
-                                elif i - j == 1:
-                                    adj_matrix_utt_utt[j, i] = 1
-                                    adj_matrix_ima_ima[j+35, i+35] = 1
-                                elif j - i == 1:
-                                    adj_matrix_utt_utt[j, i] = 1
-                                    adj_matrix_ima_ima[j+35, i+35] = 1
-                                
-                            adj_matrix_utt_utt = adj_matrix_utt_utt.tocsr()
+                                    adj_matrix_audio_audio[j+70, i+70]
+
+                            adj_matrix_text_text = adj_matrix_text_text.tocsr()
                             adj_matrix_text_ima = adj_matrix_text_ima.tocsr()
                             adj_matrix_emotion_text = adj_matrix_emotion_text.tocsr()
                             adj_matrix_speaker_text = adj_matrix_speaker_text.tocsr()
                             adj_matrix_ima_ima = adj_matrix_ima_ima.tocsr()
                             adj_matrix_speaker_ima = adj_matrix_speaker_ima.tocsr()
                             adj_matrix_emotion_ima = adj_matrix_emotion_ima.tocsr()
-                            adj_matrix_speaker_speaker = adj_matrix_speaker_speaker.tocsr()
+                            adj_matrix_text_audio = adj_matrix_text_audio.tocsr()
+                            adj_matrix_audio_audio = adj_matrix_audio_audio.tocsr()
+                            adj_matrix_audio_speaker = adj_matrix_audio_speaker.tocsr()
+                            adj_matrix_audio_emotion = adj_matrix_audio_emotion.tocsr()
 
-                        adj_matrices.append(adj_matrix_utt_utt)
+                        adj_matrices.append(adj_matrix_text_text)
                         adj_matrices.append(adj_matrix_text_ima)
                         adj_matrices.append(adj_matrix_emotion_text)
                         adj_matrices.append(adj_matrix_speaker_text)
                         adj_matrices.append(adj_matrix_ima_ima)
                         adj_matrices.append(adj_matrix_speaker_ima)
                         adj_matrices.append(adj_matrix_emotion_ima)
-                        # adj_matrices.append(adj_matrix_speaker_speaker) # not in paper
-                        
+                        adj_matrices.append(adj_matrix_text_audio)
+                        adj_matrices.append(adj_matrix_audio_audio)
+                        adj_matrices.append(adj_matrix_audio_speaker)
+                        adj_matrices.append(adj_matrix_audio_emotion)
+
                         adj_matrix.append(adj_matrices)
 
                     dialogue = []

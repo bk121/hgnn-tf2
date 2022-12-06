@@ -15,7 +15,7 @@ def replace_abbreviations(text):
 
 def readFileRows(filepath, dimension_size=17):
     word2embed = {}
-    with open(data_type+'.txt', 'r') as fopen:
+    with open('openface_features/'+data_type+'.txt', 'r') as fopen:
         for line in fopen:
             w = line.strip().split()
             word2embed[' '.join(w[:-dimension_size])] = w[-dimension_size:]
@@ -37,6 +37,7 @@ def readFileRows(filepath, dimension_size=17):
         dialogue = []
         speaker = []
         emotion = []
+        ids = []
         index = -1
         tk = MosesTokenizer()
         count = 0
@@ -50,17 +51,18 @@ def readFileRows(filepath, dimension_size=17):
                     dialogue.append(' '.join(tk.tokenize(replace_abbreviations(Utterance[index]))))
                     speaker.append(replace_abbreviations(Speaker[index]))
                     emotion.append(Emotion[index])
+                    ids.append(Dialogue_ID[index]+'_'+Utterance_ID[index])
 
                 else:
                     if len(dialogue) < 2:
-                        dialogue, speaker, emotion = [], [], []
+                        dialogue, speaker, emotion, ids = [], [], [], []
                         continue;
 
                     with open(filepath_w_query, 'a') as f_q, open(filepath_w_answer, 'a') as f_a, open(filepath_w_image, 'a') as f_i:
                         for k in range(len(dialogue)-1):
 
                             for j in range(k+1):
-                                f_q.write(speaker[j] + '\t\t' +dialogue[j] + '\t\t' + emotion[j] + ' </d> ')
+                                f_q.write(ids[j] + '\t\t' + speaker[j] + '\t\t' +dialogue[j] + '\t\t' + emotion[j] + ' </d> ')
                                 dia_utt = 'dia'+str(idx)+'_utt'+str(j)
                                 if dia_utt not in word2embed.keys():
                                     count += 1
@@ -85,8 +87,8 @@ def readFileRows(filepath, dimension_size=17):
 
 
 filepath = data_type+'_sent_emo.csv'
-filepath_w_query = 'corpora/'+data_type+'_query.txt'
-filepath_w_answer = 'corpora/'+data_type+'_answer.txt'
-filepath_w_image = 'corpora/'+data_type+'_image.txt'
+filepath_w_query = data_type+'_query.txt'
+filepath_w_answer = data_type+'_answer.txt'
+filepath_w_image = data_type+'_image.txt'
 readFileRows(filepath)
 
