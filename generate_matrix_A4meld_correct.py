@@ -64,17 +64,17 @@ def readFileRows(filepath):
                         continue;
                     for k in range(len(dialogue)-1):
                         adj_matrices = []
-                        adj_matrix_text_text = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_text_ima = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_emotion_text = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_speaker_text = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_ima_ima = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_speaker_ima = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_emotion_ima = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_text_audio = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_audio_audio = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_audio_speaker = sp.lil_matrix((125, 125), dtype='int8')
-                        adj_matrix_audio_emotion = sp.lil_matrix((125, 125), dtype='int8')
+                        adj_matrix_text_text = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_text_ima = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_emotion_text = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_speaker_text = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_ima_ima = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_speaker_ima = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_emotion_ima = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_text_audio = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_audio_audio = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_audio_speaker = sp.lil_matrix((119, 119), dtype='int8')
+                        adj_matrix_audio_emotion = sp.lil_matrix((119, 119), dtype='int8')
                         
                         for j in range(k+1):
                             adj_matrix_speaker_text[j, 105+word2embed[speaker[j]]] = 1
@@ -87,12 +87,12 @@ def readFileRows(filepath):
                             adj_matrix_text_audio[j, j+70] = 1
                             adj_matrix_audio_speaker[105+word2embed[speaker[j]], j+70] = 1
                             adj_matrix_audio_speaker[j+70, 105+word2embed[speaker[j]]] = 1
-                            adj_matrix_audio_emotion[118+emotion2idx[emotion[j]], j+70] = 1
-                            adj_matrix_audio_emotion[j+70, 118+emotion2idx[emotion[j]]] = 1
-                            adj_matrix_emotion_text[j, 118+emotion2idx[emotion[j]]] = 1
-                            adj_matrix_emotion_text[118+emotion2idx[emotion[j]], j] = 1
-                            adj_matrix_emotion_ima[j+35, 118+emotion2idx[emotion[j]]] = 1
-                            adj_matrix_emotion_ima[118+emotion2idx[emotion[j]], j+35] = 1
+                            adj_matrix_audio_emotion[112+emotion2idx[emotion[j]], j+70] = 1
+                            adj_matrix_audio_emotion[j+70, 112+emotion2idx[emotion[j]]] = 1
+                            adj_matrix_emotion_text[j, 112+emotion2idx[emotion[j]]] = 1
+                            adj_matrix_emotion_text[112+emotion2idx[emotion[j]], j] = 1
+                            adj_matrix_emotion_ima[j+35, 112+emotion2idx[emotion[j]]] = 1
+                            adj_matrix_emotion_ima[112+emotion2idx[emotion[j]], j+35] = 1
                             for i in range(k+1):
                                 if (speaker[i] == speaker[j] and i != j) or i - j == 1 or j - i == 1:
                                     adj_matrix_text_text[j, i] = 1

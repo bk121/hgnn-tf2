@@ -38,35 +38,17 @@ class HGNN(tf.keras.Model):
     self.personality_dense = tf.keras.layers.Dense(hp.hidden_units, activation = tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
     self.personality_embedding.build(None)
 
-    self.emotion_embedding = tf.keras.layers.Embedding(7, hp.hidden_units, embeddings_regularizer=hp.regularisation, embeddings_initializer=hp.initialisation)
-    self.emotion_embedding.build(None)
+    # self.emotion_embedding = tf.keras.layers.Embedding(7, hp.hidden_units, embeddings_regularizer=hp.regularisation, embeddings_initializer=hp.initialisation)
+    # self.emotion_embedding.build(None)
 
     self.image_dense = tf.keras.layers.Dense(hp.hidden_units, activation = tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
 
     self.audio_dense = tf.keras.layers.Dense(hp.hidden_units, activation = tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
 
     
-    # self.text_dense = tf.keras.layers.Dense(hp.hidden_units, activation=tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
-    # self.text_dropout = tf.keras.layers.Dropout(rate=hp.dropout)
-    # self.attention_layers = []
-    # self.feed_forwards = []
-    # for i in range(hp.attention_layers):
-    #   self.attention_layers.append(tf.keras.layers.MultiHeadAttention(hp.num_heads, hp.hidden_units, dropout=hp.dropout, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation))
-    #   self.feed_forwards.append(FeedForward(768, kernel_regularizer=hp.regularisation, kernel_initializer=hp.initialisation, dropout_rate=hp.dropout))
     self.text_lstm = tf.keras.layers.LSTM(hp.hidden_units, return_sequences=True, return_state=True, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation, dropout=hp.dropout)
     
-
-
-    self.h_layers = []
-    self.dropout_layers = []
-    self.layer_normalisation = []
-    self.is_layer_normalisation = hp.layer_normalisation
-    for i in range(hp.h_layers):
-      self.h_layers.append(HGraph(hp.hidden_units, hp))
-      self.dropout_layers.append(tf.keras.layers.Dropout(rate=hp.dropout))
-      self.layer_normalisation.append(tf.keras.layers.LayerNormalization())
-    self.h_dense = tf.keras.layers.Dense(hp.hidden_units, activation=tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
-
+   
     self.source_emotion_lstm = tf.keras.layers.LSTM(hp.hidden_units, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation, dropout=hp.dropout)
     self.emotion_categories = tf.keras.layers.Dense(7, activation=tf.keras.activations.softmax, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
 
@@ -74,19 +56,19 @@ class HGNN(tf.keras.Model):
     batch_size = tf.shape(X_image)[0]
 
     # construct personality nodes
-    personality = self.personality_embedding.weights[0]
-    personality = self.personality_dense(personality)
-    personality = tf.tile(tf.expand_dims(personality, 0), [batch_size, 1, 1]) # shape = (32, 7, 256)
+    # personality = self.personality_embedding.weights[0]
+    # personality = self.personality_dense(personality)
+    # personality = tf.tile(tf.expand_dims(personality, 0), [batch_size, 1, 1]) # shape = (32, 7, 256)
     
 
-    # construct emotion nodes
-    emotion = self.emotion_embedding.weights[0]  
-    emotion = tf.tile(tf.expand_dims(emotion, 0), [batch_size, 1, 1]) # shape = (32, 7, 256)
+    # # construct emotion nodes
+    # emotion = self.emotion_embedding.weights[0]  
+    # emotion = tf.tile(tf.expand_dims(emotion, 0), [batch_size, 1, 1]) # shape = (32, 7, 256)
     
 
     # construct image nodes
     image = self.image_dense(X_image) # shape = (32, 35, 256)
-
+    image = tf.reduce_mean(image, axis=1)
     # construct text nodes
   
     # text += positional_encoding(length=35, depth=768)[tf.newaxis, :35, :]
@@ -97,33 +79,20 @@ class HGNN(tf.keras.Model):
     # text = self.text_dropout(text)
 
     whole_seq_output, final_memory_state, final_carry_state = self.text_lstm(text, mask=src_emotion_mask)
-    text = whole_seq_output
+    # text = whole_seq_output
+    text = final_memory_state
 
     # construct audio nodes
     audio = self.audio_dense(X_audio)
-
-    # concatenate nodes together 
-    enc = tf.concat((text, image), -2)
-    enc = tf.concat((enc, audio), -2)
-    enc = tf.concat((enc, personality), -2)  
-    enc = tf.concat((enc, emotion), -2)  # shape = (32, 90, 256)
+    audio = tf.reduce_mean(audio, axis=1)
     
-    result = enc
-    for i in range(len(self.h_layers)):
-      result = self.h_layers[i]([result, A])  # shape = (32, 90, 256)
-      result = self.dropout_layers[i](result)
-      if self.is_layer_normalisation:
-        result = self.layer_normalisation[i](result)
-    
-    result = self.h_dense(result)
-    result = tf.reduce_max(input_tensor=result, axis = 1)
 
     speaker = self.personality_embedding(Speakers)
     speaker = self.personality_dense(speaker)
 
     source_emotion = self.source_emotion_lstm(SRC_emotion, mask=src_emotion_mask)
 
-    result = tf.concat([result,speaker,source_emotion], axis=1)
+    result = tf.concat([text,speaker,source_emotion, audio, image], axis=1)
 
     prob_dist = self.emotion_categories(result)
 
