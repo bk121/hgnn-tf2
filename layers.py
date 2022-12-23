@@ -36,8 +36,8 @@ class HGraph(tf.keras.layers.Layer):
         self.num_nodes = None
         self.num_features = None
         self.num_relations = None
-        self.initialisation = hp.initialisation
-        self.regularisation = hp.regularisation
+        self.initialisation = hp['initialisation']
+        self.regularisation = hp['regularisation']
         super().__init__(**kwargs)
 
     def build(self, input_shapes):

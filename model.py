@@ -34,41 +34,44 @@ class HGNN(tf.keras.Model):
   def __init__(self, hp, name=None, **kwargs):
     super().__init__(**kwargs)
 
-    self.personality_embedding = tf.keras.layers.Embedding(7, 5, trainable=False, embeddings_regularizer=hp.regularisation, embeddings_initializer=tf.keras.initializers.Constant(personality_embed))
-    self.personality_dense = tf.keras.layers.Dense(hp.hidden_units, activation = tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
+    self.personality_embedding = tf.keras.layers.Embedding(7, 5, trainable=False, embeddings_regularizer=hp['regularisation'], embeddings_initializer=tf.keras.initializers.Constant(personality_embed))
+    self.personality_dense = tf.keras.layers.Dense(hp['hidden_units'], activation = tf.keras.activations.sigmoid, activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'])
     self.personality_embedding.build(None)
 
-    self.emotion_embedding = tf.keras.layers.Embedding(7, hp.hidden_units, embeddings_regularizer=hp.regularisation, embeddings_initializer=hp.initialisation)
+    self.emotion_embedding = tf.keras.layers.Embedding(7, hp['hidden_units'], embeddings_regularizer=hp['regularisation'], embeddings_initializer=hp['initialisation'])
     self.emotion_embedding.build(None)
 
-    self.image_dense = tf.keras.layers.Dense(hp.hidden_units, activation = tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
+    self.image_dense = tf.keras.layers.Dense(hp['hidden_units'], activation = tf.keras.activations.sigmoid, activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'])
 
-    self.audio_dense = tf.keras.layers.Dense(hp.hidden_units, activation = tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
+    self.audio_dense = tf.keras.layers.Dense(hp['hidden_units'], activation = tf.keras.activations.sigmoid, activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'])
 
     
-    # self.text_dense = tf.keras.layers.Dense(hp.hidden_units, activation=tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
-    # self.text_dropout = tf.keras.layers.Dropout(rate=hp.dropout)
+    # self.text_dense = tf.keras.layers.Dense(hp['hidden_units'], activation=tf.keras.activations.sigmoid, activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'])
+    # self.text_dropout = tf.keras.layers.Dropout(rate=hp['dropout'])
     # self.attention_layers = []
     # self.feed_forwards = []
-    # for i in range(hp.attention_layers):
-    #   self.attention_layers.append(tf.keras.layers.MultiHeadAttention(hp.num_heads, hp.hidden_units, dropout=hp.dropout, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation))
-    #   self.feed_forwards.append(FeedForward(768, kernel_regularizer=hp.regularisation, kernel_initializer=hp.initialisation, dropout_rate=hp.dropout))
-    self.text_lstm = tf.keras.layers.LSTM(hp.hidden_units, return_sequences=True, return_state=True, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation, dropout=hp.dropout)
+    # for i in range(hp['attention_layers']):
+    #   self.attention_layers.append(tf.keras.layers.MultiHeadAttention(hp['num_heads'], hp['hidden_units'], dropout=hp['dropout'], activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation']))
+    #   self.feed_forwards.append(FeedForward(768, kernel_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'], dropout_rate=hp['dropout']))
+    self.text_lstm = tf.keras.layers.LSTM(hp['hidden_units'], return_sequences=True, activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'], dropout=hp['dropout'])
     
 
 
     self.h_layers = []
     self.dropout_layers = []
     self.layer_normalisation = []
-    self.is_layer_normalisation = hp.layer_normalisation
-    for i in range(hp.h_layers):
-      self.h_layers.append(HGraph(hp.hidden_units, hp))
-      self.dropout_layers.append(tf.keras.layers.Dropout(rate=hp.dropout))
+    self.is_layer_normalisation = hp['layer_normalisation']
+    for i in range(hp['h_layers']):
+      self.h_layers.append(HGraph(hp['hidden_units'], hp))
+      self.dropout_layers.append(tf.keras.layers.Dropout(rate=hp['dropout']))
       self.layer_normalisation.append(tf.keras.layers.LayerNormalization())
-    self.h_dense = tf.keras.layers.Dense(hp.hidden_units, activation=tf.keras.activations.sigmoid, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
+    self.h_dense = tf.keras.layers.Dense(hp['hidden_units'], activation=tf.keras.activations.sigmoid, activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'])
 
-    self.source_emotion_lstm = tf.keras.layers.LSTM(hp.hidden_units, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation, dropout=hp.dropout)
-    self.emotion_categories = tf.keras.layers.Dense(7, activation=tf.keras.activations.softmax, activity_regularizer=hp.regularisation, kernel_initializer=hp.initialisation)
+    if hp['bidirec']:
+      self.source_emotion_lstm = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(hp['hidden_units'], activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'], dropout=hp['dropout']))
+    else:
+      self.source_emotion_lstm = tf.keras.layers.LSTM(hp['hidden_units'], activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'], dropout=hp['dropout'])
+    self.emotion_categories = tf.keras.layers.Dense(7, activation=tf.keras.activations.softmax, activity_regularizer=hp['regularisation'], kernel_initializer=hp['initialisation'])
 
   def call(self, text, X_image, SRC_emotion, Speakers, A, X_audio, X_turn_number, src_emotion_mask):
     batch_size = tf.shape(X_image)[0]
@@ -96,8 +99,7 @@ class HGNN(tf.keras.Model):
     # text = self.text_dense(text)
     # text = self.text_dropout(text)
 
-    whole_seq_output, final_memory_state, final_carry_state = self.text_lstm(text, mask=src_emotion_mask)
-    text = whole_seq_output
+    text = self.text_lstm(text, mask=src_emotion_mask)
 
     # construct audio nodes
     audio = self.audio_dense(X_audio)

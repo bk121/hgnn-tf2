@@ -37,13 +37,13 @@ emoidx2vad = [
 
 base_dir = os.getcwd() + '/'
 def load_de_vocab(hp):
-    vocab = [line.split()[0] for line in open(base_dir+'preprocessed/de.vocab.tsv', 'r').read().splitlines() if int(line.split()[1])>=hp.min_cnt]
+    vocab = [line.split()[0] for line in open(base_dir+'preprocessed/de.vocab.tsv', 'r').read().splitlines() if int(line.split()[1])>=hp['min_cnt']]
     word2idx = {word: idx for idx, word in enumerate(vocab)}
     idx2word = {idx: word for idx, word in enumerate(vocab)}
     return word2idx, idx2word
 
 def load_en_vocab(hp):
-    vocab = [line.split()[0] for line in open(base_dir+'preprocessed/en.vocab.tsv', 'r').read().splitlines() if int(line.split()[1])>=hp.min_cnt]
+    vocab = [line.split()[0] for line in open(base_dir+'preprocessed/en.vocab.tsv', 'r').read().splitlines() if int(line.split()[1])>=hp['min_cnt']]
     word2idx = {word: idx for idx, word in enumerate(vocab)}
     idx2word = {idx: word for idx, word in enumerate(vocab)}
     return word2idx, idx2word
@@ -109,7 +109,7 @@ def create_data(hp, source_sents, target_sents, image_fea, A, audio_features):
         y_image.append([float(item) for item in y_imag.split()])
 
         
-        if max(len(x), len(y)) <=hp.maxlen:
+        if max(len(x), len(y)) <=hp['maxlen']:
             utt_ids_list.append(utt_ids)
             x_list.append(np.array(x, dtype=object))
             x_image_list.append(np.array(x_image))
@@ -126,27 +126,27 @@ def create_data(hp, source_sents, target_sents, image_fea, A, audio_features):
         # print(Src_emotion)
         # print(X_speakers)
         # exit()
-    X_audio = np.zeros([len(x_list), hp.max_turn, 1611], np.float32)
-    X = np.zeros([len(x_list), hp.max_turn, hp.maxlen], np.int32)
-    X_image = np.zeros([len(x_list), hp.max_turn, 17], np.float32)
+    X_audio = np.zeros([len(x_list), hp['max_turn'], 1611], np.float32)
+    X = np.zeros([len(x_list), hp['max_turn'], hp['maxlen']], np.int32)
+    X_image = np.zeros([len(x_list), hp['max_turn'], 17], np.float32)
     Y_image = np.zeros([len(x_list), 17], np.float32)
-    Y = np.zeros([len(y_list), hp.maxlen], np.int32)
-    X_length = np.zeros([len(x_list), hp.max_turn], np.int32)
+    Y = np.zeros([len(y_list), hp['maxlen']], np.int32)
+    X_length = np.zeros([len(x_list), hp['max_turn']], np.int32)
     X_turn_number = np.zeros([len(x_list)], np.int32)
-    SRC_emotion = np.zeros([len(x_list), hp.max_turn], np.int32)
+    SRC_emotion = np.zeros([len(x_list), hp['max_turn']], np.int32)
     TGT_emotion = np.zeros([len(y_list)], np.int32)
     Speakers = np.zeros([len(y_list)], np.int32)
-    X_Speakers = np.zeros([len(x_list), hp.max_turn], np.int32)
+    X_Speakers = np.zeros([len(x_list), hp['max_turn']], np.int32)
     X_A = np.zeros([len(x_list), 11, 119, 119], np.float32)
     for i, (x, y, z) in enumerate(zip(x_list, y_list, x_image_list)):
         j = 0
         for j in range(len(x)): 
-            if j >= hp.max_turn :
+            if j >= hp['max_turn'] :
                 break
-            if len(x[j])<hp.maxlen:
-                X[i][j] = np.lib.pad(x[j], [0, hp.maxlen-len(x[j])], 'constant', constant_values=(0, 0))
+            if len(x[j])<hp['maxlen']:
+                X[i][j] = np.lib.pad(x[j], [0, hp['maxlen']-len(x[j])], 'constant', constant_values=(0, 0))
             else:
-                X[i][j]=x[j][:hp.maxlen]#
+                X[i][j]=x[j][:hp['maxlen']]#
             X_image[i][j] = z[j]
             X_length[i][j] = len(x[j])
             SRC_emotion[i][j] = Src_emotion[i][j][0]
@@ -159,7 +159,7 @@ def create_data(hp, source_sents, target_sents, image_fea, A, audio_features):
         Y_image[i] = y_image_list[i]
         X_image[i][j+1] = y_image_list[i]
 
-        Y[i] = np.lib.pad(y, [0, hp.maxlen-len(y)], 'constant', constant_values=(0, 0))
+        Y[i] = np.lib.pad(y, [0, hp['maxlen']-len(y)], 'constant', constant_values=(0, 0))
         TGT_emotion[i] = Tgt_emotion[i][0]
         Speakers[i] = Speaker[i][0]
         for k in range(len(x_A[i])):
@@ -210,24 +210,24 @@ def load_data(hp, data_type):
         mask[i][:turn_number-1]=1
     src_emotion_mask=mask.astype(bool)
 
-    # datapoint = 30
-    # speaker2idx, idx2speaker = load_speaker_vocab(hp)
-    # print(X_turn_number[datapoint])
-    # print('Next Speaker:')
-    # print(idx2speaker[Speakers[datapoint]])
-    # print()
-    # print('Speaker History:')
-    # print([idx2speaker[speaker] for speaker in X_Speakers[datapoint]])
-    # print()
-    # print('Emotional History:')
-    # print([idx2emotion[emo] for emo in SRC_emotion[datapoint]])
-    # print()
-    # print('Last Emotional State:')
-    # print(last_state[datapoint])
-    # print()
-    # print('Mask:')
-    # print(mask[datapoint])
-    # exit()
+    datapoint = 30
+    speaker2idx, idx2speaker = load_speaker_vocab(hp)
+    print(X_turn_number[datapoint])
+    print('Next Speaker:')
+    print(idx2speaker[Speakers[datapoint]])
+    print()
+    print('Speaker History:')
+    print([idx2speaker[speaker] for speaker in X_Speakers[datapoint]])
+    print()
+    print('Emotional History:')
+    print([idx2emotion[emo] for emo in SRC_emotion[datapoint]])
+    print()
+    print('Last Emotional State:')
+    print(last_state[datapoint])
+    print()
+    print('Mask:')
+    print(mask[datapoint])
+    exit()
 
     SRC_emotion=last_state
     bert=True
@@ -300,7 +300,7 @@ def get_dataset(hp, data_type, regenerate=False):
     
     dataset = tf.data.Dataset.from_tensor_slices(tuple(data))
     dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
-    dataset = dataset.batch(hp.batch_size)
+    dataset = dataset.batch(hp['batch_size'])
 
     # for i, (X, X_image, Y_image, X_length, Y, Sources, Targets, X_turn_number, SRC_emotion, TGT_emotion, Speakers, A, X_audio) in enumerate(dataset):
     #     print(X)
