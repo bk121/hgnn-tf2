@@ -118,133 +118,154 @@ class HGraph(tf.keras.layers.Layer):
         A_sum = tf.stack(A_, axis=1)
         A_sum = tf.math.reduce_sum(A_sum, axis=1)
         AHWs = []
+        # tf.print(A_sum, summarize=-1)
+        # exit()
         for i in range(self.node_types):
             type_A = Mask[i] * A_sum 
             HW = features @ self.W[i] 
+            # if i==4:
+              # print(type_A)
+              # print(type_A @ HW)
+              # exit()
             AHW = type_A @ HW + self.B[i] 
+            # print(AHW)
             AHWs.append(AHW)
         AHWs_stacked = tf.stack(AHWs, axis=1) 
         output = tf.math.reduce_sum(AHWs_stacked, axis=1) 
-        return tf.keras.activations.relu(output)
+        # print(output)
+        # exit()
+        # print(self.W[0])
+        return tf.keras.activations.sigmoid(output)
 
 
 
+
+class TransformerBlock(tf.keras.layers.Layer):
+    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1):
+        super(TransformerBlock, self).__init__()
+        self.att = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
+        self.ffn = tf.keras.Sequential(
+            [tf.keras.layers.Dense(ff_dim, activation="relu"), tf.keras.layers.Dense(embed_dim),]
+        )
+        self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.dropout1 = tf.keras.layers.Dropout(rate)
+        self.dropout2 = tf.keras.layers.Dropout(rate)
+
+    def call(self, inputs, training):
+        # print(mask)
+        # exit()
+        attn_output = self.att(inputs, inputs)
+        attn_output = self.dropout1(attn_output, training=training)
+        out1 = self.layernorm1(inputs + attn_output)
+        ffn_output = self.ffn(out1)
+        ffn_output = self.dropout2(ffn_output, training=training)
+        # print(out1)
+        # print(ffn_output)
+        # exit()
+        return self.layernorm2(out1 + ffn_output)
+
+
+
+
+
+
+class PositionalEmbedding(tf.keras.layers.Layer):
+  def __init__(self, vocab_size, d_model, length):
+    super().__init__()
+    self.d_model = d_model
+    self.embedding = tf.keras.layers.Embedding(7, self.d_model, mask_zero=True) 
+    self.pos_encoding = positional_encoding(length=length, depth=self.d_model)
+
+  def compute_mask(self, *args, **kwargs):
+    return self.embedding.compute_mask(*args, **kwargs)
+
+  def call(self, x):
+    length = tf.shape(x)[1]
+    x = self.embedding(x)
+    # This factor sets the relative scale of the embedding and positonal_encoding.
+    x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
+    x = x + self.pos_encoding[tf.newaxis, :length, :]
+    return x
+
+
+class BaseAttention(tf.keras.layers.Layer):
+  def __init__(self, **kwargs):
+    super().__init__()
+    self.mha = tf.keras.layers.MultiHeadAttention(**kwargs)
+    self.layernorm = tf.keras.layers.LayerNormalization()
+    self.add = tf.keras.layers.Add()
+
+
+class GlobalSelfAttention(BaseAttention):
+  def call(self, x):
+    attn_output = self.mha(
+        query=x,
+        value=x,
+        key=x)
+    x = self.add([x, attn_output])
+    x = self.layernorm(x)
+    return x
 
 class FeedForward(tf.keras.layers.Layer):
-    """Position-wise feed-forward layer.
-    # Arguments
-        units: int >= 0. Dimension of hidden units.
-        activation: Activation function to use
-        use_bias: Boolean, whether the layer uses a bias vector.
-        kernel_initializer: Initializer for the `kernel` weights matrix.
-        bias_initializer: Initializer for the bias vector.
-        kernel_regularizer: Regularizer function applied to the `kernel` weights matrix.
-        bias_regularizer: Regularizer function applied to the bias vector.
-        kernel_constraint: Constraint function applied to the `kernel` weights matrix.
-        bias_constraint: Constraint function applied to the bias vector.
-        dropout_rate: 0.0 <= float <= 1.0. Dropout rate for hidden units.
-    # Input shape
-        3D tensor with shape: `(batch_size, ..., input_dim)`.
-    # Output shape
-        3D tensor with shape: `(batch_size, ..., input_dim)`.
-    # References
-        - [Attention is All You Need](https://arxiv.org/pdf/1706.03762.pdf)
-    """
+  def __init__(self, d_model, dff, dropout_rate=0.1):
+    super().__init__()
+    self.seq = tf.keras.Sequential([
+      tf.keras.layers.Dense(dff, activation='relu'),
+      tf.keras.layers.Dense(d_model),
+      tf.keras.layers.Dropout(dropout_rate)
+    ])
+    self.add = tf.keras.layers.Add()
+    self.layer_norm = tf.keras.layers.LayerNormalization()
 
-    def __init__(self,
-                 units,
-                 activation='relu',
-                 use_bias=True,
-                 kernel_initializer='glorot_normal',
-                 bias_initializer='zeros',
-                 kernel_regularizer=None,
-                 bias_regularizer=None,
-                 kernel_constraint=None,
-                 bias_constraint=None,
-                 dropout_rate=0.0,
-                 **kwargs):
-        self.supports_masking = True
-        self.units = units
-        self.activation = keras.activations.get(activation)
-        self.use_bias = use_bias
-        self.kernel_initializer = keras.initializers.get(kernel_initializer)
-        self.bias_initializer = keras.initializers.get(bias_initializer)
-        self.kernel_regularizer = keras.regularizers.get(kernel_regularizer)
-        self.bias_regularizer = keras.regularizers.get(bias_regularizer)
-        self.kernel_constraint = keras.constraints.get(kernel_constraint)
-        self.bias_constraint = keras.constraints.get(bias_constraint)
-        self.dropout_rate = dropout_rate
-        self.W1, self.b1 = None, None
-        self.W2, self.b2 = None, None
-        super(FeedForward, self).__init__(**kwargs)
+  def call(self, x):
+    x = self.add([x, self.seq(x)])
+    x = self.layer_norm(x) 
+    return x
 
-    def get_config(self):
-        config = {
-            'units': self.units,
-            'activation': keras.activations.serialize(self.activation),
-            'use_bias': self.use_bias,
-            'kernel_initializer': keras.initializers.serialize(self.kernel_initializer),
-            'bias_initializer': keras.initializers.serialize(self.bias_initializer),
-            'kernel_regularizer': keras.regularizers.serialize(self.kernel_regularizer),
-            'bias_regularizer': keras.regularizers.serialize(self.bias_regularizer),
-            'kernel_constraint': keras.constraints.serialize(self.kernel_constraint),
-            'bias_constraint': keras.constraints.serialize(self.bias_constraint),
-            'dropout_rate': self.dropout_rate,
-        }
-        base_config = super(FeedForward, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+class EncoderLayer(tf.keras.layers.Layer):
+  def __init__(self,*, d_model, num_heads, dff, dropout_rate=0.1):
+    super().__init__()
 
-    def compute_output_shape(self, input_shape):
-        return input_shape
+    self.self_attention = GlobalSelfAttention(
+        num_heads=num_heads,
+        key_dim=d_model,
+        dropout=dropout_rate)
 
-    def compute_mask(self, inputs, input_mask=None):
-        return input_mask
+    self.ffn = FeedForward(d_model, dff)
 
-    def build(self, input_shape):
-        feature_dim = int(input_shape[-1])
-        self.W1 = self.add_weight(
-            shape=(feature_dim, self.units),
-            initializer=self.kernel_initializer,
-            regularizer=self.kernel_regularizer,
-            constraint=self.kernel_constraint,
-            name='{}_W1'.format(self.name),
-        )
-        if self.use_bias:
-            self.b1 = self.add_weight(
-                shape=(self.units,),
-                initializer=self.bias_initializer,
-                regularizer=self.bias_regularizer,
-                constraint=self.bias_constraint,
-                name='{}_b1'.format(self.name),
-            )
-        self.W2 = self.add_weight(
-            shape=(self.units, feature_dim),
-            initializer=self.kernel_initializer,
-            regularizer=self.kernel_regularizer,
-            constraint=self.kernel_constraint,
-            name='{}_W2'.format(self.name),
-        )
-        if self.use_bias:
-            self.b2 = self.add_weight(
-                shape=(feature_dim,),
-                initializer=self.bias_initializer,
-                regularizer=self.bias_regularizer,
-                constraint=self.bias_constraint,
-                name='{}_b2'.format(self.name),
-            )
-        super(FeedForward, self).build(input_shape)
+  def call(self, x):
+    x = self.self_attention(x)
+    x = self.ffn(x)
+    return x
 
-    def call(self, x, mask=None, training=None):
-        h = K.dot(x, self.W1)
-        if self.use_bias:
-            h = K.bias_add(h, self.b1)
-        if self.activation is not None:
-            h = self.activation(h)
-        if 0.0 < self.dropout_rate < 1.0:
-            def dropped_inputs():
-                return K.dropout(h, self.dropout_rate, K.shape(h))
-            h = K.in_train_phase(dropped_inputs, h, training=training)
-        y = K.dot(h, self.W2)
-        if self.use_bias:
-            y = K.bias_add(y, self.b2)
-        return y
+class Encoder(tf.keras.layers.Layer):
+  def __init__(self, *, num_layers, d_model, num_heads,
+               dff, vocab_size, dropout_rate=0.1):
+    super().__init__()
+
+    self.d_model = d_model
+    self.num_layers = num_layers
+
+    self.pos_embedding = PositionalEmbedding(
+        vocab_size=vocab_size, d_model=d_model, length=dff)
+
+    self.enc_layers = [
+        EncoderLayer(d_model=d_model,
+                     num_heads=num_heads,
+                     dff=dff,
+                     dropout_rate=dropout_rate)
+        for _ in range(num_layers)]
+    self.dropout = tf.keras.layers.Dropout(dropout_rate)
+
+  def call(self, x):
+    # `x` is token-IDs shape: (batch, seq_len)
+    x = self.pos_embedding(x)  # Shape `(batch_size, seq_len, d_model)`.
+    
+    # Add dropout.
+    x = self.dropout(x)
+
+    for i in range(self.num_layers):
+      x = self.enc_layers[i](x)
+
+    return x  # Shape `(batch_size, seq_len, d_model)`.

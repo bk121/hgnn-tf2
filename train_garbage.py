@@ -1,6 +1,6 @@
 import layers
 from data_load import get_dataset, load_de_vocab, load_en_vocab
-import model_all, model_image, model_audio, model_src_emo, model_text, model_spk_emo, model_2_emo, model_2_spk_2_emo, model_minus_2_emo, model_minus_2_spk, model_minus_text, model_minus_audio, model_minus_image
+import model_all, model_src_emo, model_text, model_spk_emo, model_2_emo, model_2_spk_2_emo, model_minus_2_emo, model_minus_2_spk, model_minus_text, model_minus_audio, model_minus_image, model_garbage
 import tensorflow as tf
 import tensorflow_addons as tfa
 import focal_loss as fl
@@ -12,12 +12,11 @@ from tqdm import tqdm
 import shutil
 import copy
 
-run=False
 
 def main():
 
     hp = {'num_epochs': 20, 'batch_size': 16, 'lr':0.001, 'initialisation':'glorot_uniform', 'regularisation':None, 'dropout':0.5, 'layer_normalisation':False, 'optimizer':'Adam',
-                        'num_heads':2, 'attention_layers':2, 'h_layers':1, 'hidden_units':64, 'loss':'cat_cross', 'maxlen':50, 'max_turn':35, 'min_cnt':1, 'model':'model_audio'}
+                        'num_heads':2, 'attention_layers':2, 'h_layers':1, 'hidden_units':64, 'loss':'cat_cross', 'maxlen':50, 'max_turn':35, 'min_cnt':1, 'model':'model_garbage'}
     wnb=True
     if wnb:
         wandb.init(project='hgnn tf2')
@@ -25,16 +24,12 @@ def main():
         hp=wandb.config
 
 
+    train_dataset = get_dataset(hp, 'train')
     validation_dataset = get_dataset(hp, 'dev')
     test_dataset = get_dataset(hp, 'test')
-    train_dataset = get_dataset(hp, 'train')
 
     if hp['model']=='model_all':
         hgnn = model_all.HGNN(hp)
-    elif hp['model']=='model_image':
-        hgnn = model_image.HGNN(hp)
-    elif hp['model']=='model_audio':
-        hgnn = model_audio.HGNN(hp)
     elif hp['model']=='model_src_emo':
         hgnn = model_src_emo.HGNN(hp)
     elif hp['model']=='model_text':
@@ -55,7 +50,8 @@ def main():
         hgnn = model_minus_audio.HGNN(hp)
     elif hp['model']=='model_minus_image':
         hgnn = model_minus_image.HGNN(hp)
-
+    elif hp['model']=='model_garbage':
+        hgnn = model_garbage.HGNN(hp)
 
 
     metrics = {'train':{}, 'validation':{}, 'test':{}}
@@ -83,10 +79,9 @@ def main():
     best_dev_weighted_f1 = 0
 
     def update_metrics(dataset, model, metrics_dict):
-        for (X, X_image, Y_image, X_length,Y, Sources, Targets, X_turn_number, SPK_emotion, SRC_emotion, TGT_emotion, Speakers, A, X_audio, src_emotion_mask, X_Speakers) in dataset:
-            emotion_probs = model(X, X_image, SPK_emotion, SRC_emotion, Speakers, A, X_audio, X_turn_number, src_emotion_mask, X_Speakers, training=False)
+        for (X, X_image, Y_image, X_length,Y, Sources, Targets, X_turn_number, SPK_emotion, SRC_emotion, TGT_emotion, Speakers, A, X_audio, src_emotion_mask, X_Speakers, garbage) in dataset:
+            emotion_probs = model(X, X_image, SPK_emotion, SRC_emotion, Speakers, A, X_audio, X_turn_number, src_emotion_mask, X_Speakers, garbage, training=False)
             # emotion_probs = tf.one_hot(tf.zeros(TGT_emotion.shape, tf.int32), 7)
-            # emotion_probs = tf.one_hot(tf.random.uniform(TGT_emotion.shape, maxval=7, dtype=tf.int32), 7)
             for m in metrics_dict.values():
                 m.update_state(tf.one_hot(TGT_emotion, 7), emotion_probs) 
 
@@ -114,9 +109,9 @@ def main():
 
     for epoch in tqdm(range(hp['num_epochs'])):
         print('Epoch: '+str(epoch+1))
-        for step, (X, X_image, Y_image, X_length,Y, Sources, Targets, X_turn_number, SPK_emotion, SRC_emotion, TGT_emotion, Speakers, A, X_audio, src_emotion_mask, X_Speakers) in enumerate(train_dataset):
+        for step, (X, X_image, Y_image, X_length,Y, Sources, Targets, X_turn_number, SPK_emotion, SRC_emotion, TGT_emotion, Speakers, A, X_audio, src_emotion_mask, X_Speakers, garbage) in enumerate(train_dataset):
             with tf.GradientTape() as tape:
-                emotion_probs = hgnn(X, X_image, SPK_emotion, SRC_emotion, Speakers, A, X_audio, X_turn_number, src_emotion_mask, X_Speakers)
+                emotion_probs = hgnn(X, X_image, SPK_emotion, SRC_emotion, Speakers, A, X_audio, X_turn_number, src_emotion_mask, X_Speakers, garbage)
                 if hp['loss'] == 'focal':
                     loss = fl.sparse_categorical_focal_loss(TGT_emotion, emotion_probs, gamma=2)
                 else:
@@ -138,23 +133,21 @@ def main():
         #     hgnn.save('saved_model/epoch_'+str(epoch))
         #     best_dev_weighted_f1=validation_weighted_f1_metric.result().numpy()
 
-if run:
-    main()
-    exit()
+main()
+exit()
 
 wandb.login()
 
 sweep_configuration = {
     'method': 'bayes',
-    'name': 'model_all',
+    'name': 'roberta',
     'metric': {'goal': 'maximize', 'name': 'Test Weighted F1'},
     'parameters': 
     {
-        'model': {'values': ['model_all']},
         'num_epochs': {'values': [20]},
         'batch_size': {'values': [16]},
         # 'lr': {'values': [0.01, 0.001, 0.0001]},
-        'lr': {'values': [0.01]},
+        'lr': {'values': [0.001]},
         'initialisation' :{'values': ['glorot_uniform']},
         # 'regularisation':{'values':['l1','l2']},
         'regularisation':{'values':[None]},
@@ -177,12 +170,6 @@ sweep_configuration = {
 model_src_emo_config = copy.deepcopy(sweep_configuration)
 model_src_emo_config['name']='model_src_emo'
 model_src_emo_config['parameters']['model']={'values':['model_src_emo']}
-model_image_config = copy.deepcopy(sweep_configuration)
-model_image_config['name']='model_image'
-model_image_config['parameters']['model']={'values':['model_image']}
-model_audio_config = copy.deepcopy(sweep_configuration)
-model_audio_config['name']='model_audio'
-model_audio_config['parameters']['model']={'values':['model_audio']}
 model_text_config = copy.deepcopy(sweep_configuration)
 model_text_config['name']='model_text'
 model_text_config['parameters']['model']={'values':['model_text']}
@@ -207,27 +194,21 @@ model_minus_image_config['parameters']['model']={'values':['model_minus_image']}
 
 
 
-sweep_id_0 = wandb.sweep(sweep=sweep_configuration, project='final')
-# sweep_id_1 = wandb.sweep(sweep=model_src_emo_config, project='final')
-# sweep_id_2 = wandb.sweep(sweep=model_text_config, project='final')
-# sweep_id_3 = wandb.sweep(sweep=model_spk_emo_config, project='final')
-# sweep_id_4 = wandb.sweep(sweep=model_minus_2_emo_config, project='final')
-# sweep_id_5 = wandb.sweep(sweep=model_minus_2_spk_config, project='final')
-# sweep_id_6 = wandb.sweep(sweep=model_minus_text_config, project='final')
-# sweep_id_7 = wandb.sweep(sweep=model_minus_audio_config, project='final')
-# sweep_id_8 = wandb.sweep(sweep=model_minus_image_config, project='final')
-# sweep_id_9 = wandb.sweep(sweep=model_image_config, project='final')
-# sweep_id_10 = wandb.sweep(sweep=model_audio_config, project='final')
+sweep_id_1 = wandb.sweep(sweep=model_src_emo_config, project='final')
+sweep_id_2 = wandb.sweep(sweep=model_text_config, project='final')
+sweep_id_3 = wandb.sweep(sweep=model_spk_emo_config, project='final')
+sweep_id_4 = wandb.sweep(sweep=model_minus_2_emo_config, project='final')
+sweep_id_5 = wandb.sweep(sweep=model_minus_2_spk_config, project='final')
+sweep_id_6 = wandb.sweep(sweep=model_minus_text_config, project='final')
+sweep_id_7 = wandb.sweep(sweep=model_minus_audio_config, project='final')
+sweep_id_8 = wandb.sweep(sweep=model_minus_image_config, project='final')
 
-wandb.agent(sweep_id_0, function=main, count=5)
-# wandb.agent(sweep_id_1, function=main, count=5)
-# wandb.agent(sweep_id_2, function=main, count=5)
-# wandb.agent(sweep_id_3, function=main, count=5)
-# wandb.agent(sweep_id_4, function=main, count=5)
-# wandb.agent(sweep_id_5, function=main, count=5)
-# wandb.agent(sweep_id_6, function=main, count=5)
-# wandb.agent(sweep_id_7, function=main, count=5)
-# wandb.agent(sweep_id_8, function=main, count=5)
-# wandb.agent(sweep_id_9, function=main, count=5)
-# wandb.agent(sweep_id_10, function=main, count=5)
+wandb.agent(sweep_id_1, function=main, count=5)
+wandb.agent(sweep_id_2, function=main, count=5)
+wandb.agent(sweep_id_3, function=main, count=5)
+wandb.agent(sweep_id_4, function=main, count=5)
+wandb.agent(sweep_id_5, function=main, count=5)
+wandb.agent(sweep_id_6, function=main, count=5)
+wandb.agent(sweep_id_7, function=main, count=5)
+wandb.agent(sweep_id_8, function=main, count=5)
 

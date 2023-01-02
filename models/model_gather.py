@@ -93,6 +93,7 @@ class HGNN(tf.keras.Model):
     # text = self.text_dense(text)
     # text = self.text_dropout(text)
     text = self.text_lstm(text, mask=src_emotion_mask, training=training)
+
     # construct audio nodes
     audio = self.audio_dense(X_audio)
 
@@ -108,21 +109,26 @@ class HGNN(tf.keras.Model):
       result = self.dropout_layers[i](result)
       if self.is_layer_normalisation:
         result = self.layer_normalisation[i](result)
-    
+
     result = self.h_dense(result)
-    result = tf.reduce_max(input_tensor=result, axis = 1)
+    result = result[:,-7:,:]
+    src = tf.gather(result, SRC_emotion-1, batch_dims=1)
+    src = self.source_emotion_lstm(src, mask=src_emotion_mask, training=training)
+
+    # result = self.h_dense(result)
+    # result = tf.reduce_max(input_tensor=result, axis = 1)
     # result = tf.reduce_mean(input_tensor=result, axis = 1)
 
-    speaker = self.personality_embedding(Speakers)
+    # speaker = self.personality_embedding(Speakers)
     # speaker = self.personality_dense(speaker)
 
-    source_emotion = self.emotion_embedding(SRC_emotion)
-    source_emotion = self.source_emotion_lstm(source_emotion, mask=src_emotion_mask, training=training)
 
-    spk_emotion = self.emotion_embedding(SPK_emotion)
-    spk_emotion = self.spk_emotion_lstm(spk_emotion, mask=src_emotion_mask, training=training)
 
-    result = tf.concat([result,speaker,source_emotion,spk_emotion], axis=1)
+    # spk_emotion = self.emotion_embedding(SPK_emotion)
+    spk = tf.gather(result, SPK_emotion-1, batch_dims=1)
+    spk = self.spk_emotion_lstm(spk, mask=src_emotion_mask, training=training)
+
+    result = tf.concat([src, spk], axis=1)
 
     prob_dist = self.emotion_categories(result)
 

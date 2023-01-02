@@ -6,3 +6,8 @@ saved_model
 serialized
 features
 process
+corpora_bert
+openface_features
+bert
+tmp
+meld

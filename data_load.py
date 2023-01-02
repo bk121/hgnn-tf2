@@ -7,11 +7,12 @@ import scipy
 import tensorflow_hub as hub
 import tensorflow_text as text
 from sentence_transformers import SentenceTransformer
-from transformers import RobertaTokenizer, TFRobertaModel
+from transformers import RobertaTokenizer, TFRobertaModel,TFAutoModelForSequenceClassification, AutoTokenizer
 
 
-emotion2idx = {'neutral': 0, 'surprise': 1, 'fear': 2, 'sadness': 3, 'joy': 4, 'disgust': 5, 'anger': 6}
-idx2emotion = {0: 'neutral', 1: 'surprise', 2: 'fear', 3: 'sadness', 4: 'joy', 5: 'disgust', 6: 'anger'}
+emotion2idx = {'neutral': 1, 'surprise': 2, 'fear': 3, 'sadness': 4, 'joy': 5, 'disgust': 6, 'anger': 7}
+emotion2idx_target = {'neutral': 0, 'surprise': 1, 'fear': 2, 'sadness': 3, 'joy': 4, 'disgust': 5, 'anger': 6}
+idx2emotion = {1: 'neutral', 2: 'surprise', 3: 'fear', 4: 'sadness', 5: 'joy', 6: 'disgust', 7: 'anger'}
 
 
 
@@ -104,7 +105,7 @@ def create_data(hp, source_sents, target_sents, image_fea, A, audio_features):
             speaker.append(speaker2idx["newer"])
         else:
             speaker.append(speaker2idx[name])
-        tgt_emotion.append(emotion2idx[target_sent_split[2].split()[0]])
+        tgt_emotion.append(emotion2idx_target[target_sent_split[2].split()[0]])
         y = [en2idx.get(word, 1) for word in (target_sent_split[1] + " </S>").split()] 
         y_image.append([float(item) for item in y_imag.split()])
 
@@ -126,7 +127,8 @@ def create_data(hp, source_sents, target_sents, image_fea, A, audio_features):
         # print(Src_emotion)
         # print(X_speakers)
         # exit()
-    X_audio = np.zeros([len(x_list), hp['max_turn'], 1611], np.float32)
+    X_audio = np.zeros([len(x_list), hp['max_turn'], 1611], np.float32)           # for opensmile features
+    # X_audio = np.zeros([len(x_list), hp['max_turn'], 300], np.float32)
     X = np.zeros([len(x_list), hp['max_turn'], hp['maxlen']], np.int32)
     X_image = np.zeros([len(x_list), hp['max_turn'], 17], np.float32)
     Y_image = np.zeros([len(x_list), 17], np.float32)
@@ -152,7 +154,12 @@ def create_data(hp, source_sents, target_sents, image_fea, A, audio_features):
             SRC_emotion[i][j] = Src_emotion[i][j][0]
             X_Speakers[i][j] = X_speakers[i][j][0]
             dialogue = utt_ids_list[i][j].strip()
-            X_audio[i][j]= audio_features[dialogue]
+            # print(dialogue)
+            # print(dialogue.split('_')[0])
+            # print(audio_features[dialogue.split('_')[0]][j])
+            # exit()
+            X_audio[i][j]= audio_features[dialogue]                       # for opensmile features
+            # X_audio[i][j]= audio_features[dialogue.split('_')[0]][j]
             
 
         X_turn_number[i] = len(x) + 1
@@ -173,10 +180,10 @@ def load_image_data(hp, data_type):
 
 
 def load_data(hp, data_type):
-    def _refine(line):
-        return line.strip()
     train_audio_emb, dev_audio_emb, test_audio_emb = pkl.load(open('features/audio_embeddings_feature_selection_emotion.pkl', 'rb'))
+    # train_audio_emb, dev_audio_emb, test_audio_emb = pkl.load(open('features/audio_emotion.pkl', 'rb'))
     source = 'corpora/'+data_type+'_query.txt'
+    bert_source = 'corpora_bert/'+data_type+'_query.txt'
     target = 'corpora/'+data_type+'_answer.txt'
     if data_type == 'train':
         audio_features=train_audio_emb
@@ -184,63 +191,82 @@ def load_data(hp, data_type):
         audio_features=dev_audio_emb
     elif data_type == 'test':
         audio_features=test_audio_emb
-    de_sents = [_refine(line) for line in open(source, 'r').read().split("\n") if line]
-
-    en_sents = [_refine(line) for line in open(target, 'r').read().split("\n") if line]
+    en_sents = [line.strip() for line in open(source, 'r').read().split("\n") if line]
+    bert_en_sents = [line.strip() for line in open(bert_source, 'r').read().split("\n") if line]
+    de_sents = [line.strip() for line in open(target, 'r').read().split("\n") if line]
     image_fea = load_image_data(hp, data_type=data_type)
     A = pkl.load(open('corpora/' + data_type+'.pkl', 'rb'))
-    X, X_image, Y_image, X_length, Y, Sources, Targets, X_turn_number, SRC_emotion, TGT_emotion, Speakers, A, X_audio, X_Speakers = create_data(hp, de_sents, en_sents, image_fea, A, audio_features)
+    X, X_image, Y_image, X_length, Y, Sources, Targets, X_turn_number, SRC_emotion, TGT_emotion, Speakers, A, X_audio, X_Speakers = create_data(hp, en_sents, de_sents, image_fea, A, audio_features)
+
+
+
+
 
     # print(SRC_emotion[:10,:])
+    # exit()
     # print(X_Speakers[:10,:])
     # print(Speakers[:10])
 
     last_state = []
     for i,speaker in enumerate(Speakers):
         emotional_turn=[]
-        emotional_state=[0.0,0.0,0.0]
+        emotional_state=1
         for j in range(len(X_Speakers[i])):
             if X_Speakers[i][j]==speaker:
-                emotional_state=emoidx2vad[SRC_emotion[i][j]]
+                emotional_state=SRC_emotion[i][j]
             emotional_turn.append(emotional_state)
         last_state.append(emotional_turn)
-    last_state = np.array(last_state, dtype=np.float32)
-    mask = np.zeros(last_state.shape[:2], np.float32)
+    last_state = np.array(last_state, dtype=np.int32)
+    mask = np.zeros(last_state.shape[:2], np.int32)
     for i, turn_number in enumerate(X_turn_number):
         mask[i][:turn_number-1]=1
+    last_state=last_state*mask
     src_emotion_mask=mask.astype(bool)
+    # print(src_emotion_mask.shape)
+    # exit()
 
-    datapoint = 30
-    speaker2idx, idx2speaker = load_speaker_vocab(hp)
-    print(X_turn_number[datapoint])
-    print('Next Speaker:')
-    print(idx2speaker[Speakers[datapoint]])
-    print()
-    print('Speaker History:')
-    print([idx2speaker[speaker] for speaker in X_Speakers[datapoint]])
-    print()
-    print('Emotional History:')
-    print([idx2emotion[emo] for emo in SRC_emotion[datapoint]])
-    print()
-    print('Last Emotional State:')
-    print(last_state[datapoint])
-    print()
-    print('Mask:')
-    print(mask[datapoint])
-    exit()
+    # datapoint = 3
+    # speaker2idx, idx2speaker = load_speaker_vocab(hp)
+    # print(X_turn_number[datapoint])
+    # print('Next Speaker:')
+    # print(idx2speaker[Speakers[datapoint]])
+    # print()
+    # print('Speaker History:')
+    # print([idx2speaker[speaker] for speaker in X_Speakers[datapoint]])
+    # print()
+    # print('Emotional History:')
+    # print([idx2emotion[emo] for emo in SRC_emotion[datapoint]])
+    # print()
+    # print('Last Emotional State:')
+    # print(last_state[datapoint])
+    # print()
+    # print('Mask:')
+    # print(mask[datapoint])
+    # exit()
 
-    SRC_emotion=last_state
+    SPK_emotion=last_state
+
     bert=True
-    datapoints = []
-    datapoint = []
-    count=0
     if bert:
-        mpnet = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
-        bert_tokenizer = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3")
-        bert_encoder = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_L-24_H-1024_A-16/4",trainable=False)
-        roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        datapoints = []
+        datapoint = []
+        count=0
 
-        for i, sentences in enumerate(de_sents):
+        # mpnet = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+        # bert_tokenizer = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3")
+        # bert_encoder = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_L-24_H-1024_A-16/4",trainable=False)
+        tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+        roberta = TFAutoModelForSequenceClassification.from_pretrained("roberta-base", num_labels=7)
+        roberta.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5, clipnorm=1.),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        metrics=[tf.metrics.SparseCategoricalAccuracy()],
+        )
+        checkpoint_filepath = "tmp/checkpoint"
+        roberta.load_weights(checkpoint_filepath)
+
+
+        for i, sentences in enumerate(bert_en_sents):
             sentences_split = sentences.split("</d>")
             sentences_split.pop()
             for sss in sentences_split:
@@ -249,23 +275,25 @@ def load_data(hp, data_type):
             datapoints.append(datapoint)
             datapoint=[]
         X = datapoints
-        ps=[]
+
         # Roberta tokenized
-        # final = tf.constant(0, shape=(1,35,50))
-        # for x in X:
-        #     tokens = roberta_tokenizer(x, return_tensors='tf', padding='max_length', max_length=50, truncation = True).input_ids
-        #     padding_amount = 35-tokens.shape[0]
-        #     tokens = tf.pad(tokens, tf.constant([[0,padding_amount],[0,0]]))
-        #     tokens = tf.expand_dims(tokens, axis=0)
-        #     final = tf.concat([final, tokens], 0)
-        # mpnet
         final = tf.constant(0.0, shape=(1,35,768))
         for x in X:
-            encoded = mpnet.encode(x)
+            tokenized = dict(tokenizer(x, max_length = 100, padding='max_length', return_tensors='tf'))
+            encoded = roberta(**tokenized, output_hidden_states=True).hidden_states[-1][:,0,:]
             padding_amount = 35-encoded.shape[0]
             encoded = tf.pad(encoded, tf.constant([[0,padding_amount],[0,0]]))
             encoded = tf.expand_dims(encoded, axis=0)
             final = tf.concat([final, encoded], 0)
+
+        # mpnet
+        # final = tf.constant(0.0, shape=(1,35,768))
+        # for x in X:
+        #     encoded = mpnet.encode(x)
+        #     padding_amount = 35-encoded.shape[0]
+        #     encoded = tf.pad(encoded, tf.constant([[0,padding_amount],[0,0]]))
+        #     encoded = tf.expand_dims(encoded, axis=0)
+        #     final = tf.concat([final, encoded], 0)
 
         # BERT sentence embedding
         # X = tf.ragged.constant(datapoints)
@@ -278,12 +306,10 @@ def load_data(hp, data_type):
         #     encoded = tf.expand_dims(encoded, axis=0)
         #     final = tf.concat([final, encoded], 0)
         
-        
-
 
 
         X = final[1:]
-    return X, X_image, Y_image, X_length,Y, Sources, Targets, X_turn_number, SRC_emotion, TGT_emotion, Speakers, A, X_audio, src_emotion_mask
+    return X, X_image, Y_image, X_length,Y, Sources, Targets, X_turn_number, SPK_emotion, SRC_emotion, TGT_emotion, Speakers, A, X_audio, src_emotion_mask, X_Speakers
 
 
 def get_dataset(hp, data_type, regenerate=False):
@@ -295,30 +321,34 @@ def get_dataset(hp, data_type, regenerate=False):
             pkl.dump(d, open(pickle_path+str(i)+'.pkl', 'wb'))
     
     data = []
-    for i in range(14):
+    for i in range(16):
         data.append(pkl.load(open(pickle_path+str(i)+'.pkl', 'rb')))
-    
+    # data.append(tf.random.normal(data[0].shape))
+    # data.append(tf.random.uniform(data[0].shape, minval=-1))
+
+
+    X_audio = data[13]
+    norm = tf.keras.layers.Normalization(mean=0.5, variance=0.25)
+    X_audio = norm(X_audio)
+    data[13]=X_audio
+
+    X_image = data[1]
+    norm = tf.keras.layers.Normalization(mean=1, variance=0.5)
+    X_image = norm(X_image)
+    data[1]=X_image
+
     dataset = tf.data.Dataset.from_tensor_slices(tuple(data))
     dataset = dataset.shuffle(10000, reshuffle_each_iteration=True)
     dataset = dataset.batch(hp['batch_size'])
-
-    # for i, (X, X_image, Y_image, X_length, Y, Sources, Targets, X_turn_number, SRC_emotion, TGT_emotion, Speakers, A, X_audio) in enumerate(dataset):
-    #     print(X)
-    #     print(X_image)
-    #     print(Speakers)
-    #     exit()
     return dataset
 
 
 if __name__ == '__main__':
     print('Testing data_load functions:')
     print()
-    parser = argparse.ArgumentParser(description='Translate script')
-    parser.add_argument('--maxlen', type=int, default=512, help='maxlen')
-    parser.add_argument('--min_cnt', type=int, default=1, help='min_cnt')
-    parser.add_argument('--max_turn', type=int, default=35, help='max_turn')
-    parser.add_argument('--batch_size', type=int, default=32, help='batch size')
-    hp = parser.parse_args()
+    hp = {'num_epochs': 40, 'batch_size': 32, 'lr':0.01, 'initialisation':'glorot_uniform', 'regularisation':None, 'dropout':0.5, 'layer_normalisation':False, 'optimizer':'Adam',
+                        'num_heads':2, 'attention_layers':2, 'h_layers':1, 'hidden_units':128, 'loss':'cat_cross', 'bidirec':False, 'maxlen':512, 'max_turn':35, 'min_cnt':1}
+    
 
     dtypes = ['dev', 'test', 'train']
     for dtype in dtypes:
